@@ -5,6 +5,7 @@ import {
   StyleSheet,
   FlatList,
   TouchableOpacity,
+  TouchableWithoutFeedback,
   Modal,
   Alert,
 } from 'react-native';
@@ -12,6 +13,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Calendar, DateData } from 'react-native-calendars';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getActivePeriod, getEntriesBetweenDates, initDatabase } from '../services/database';
 import { MealEntry, Period, MEAL_PRICES } from '../types';
 
@@ -70,6 +72,20 @@ export function ReportScreen() {
   const [showCalendar, setShowCalendar] = useState(false);
   const [selectingDate, setSelectingDate] = useState<'start' | 'end'>('start');
 
+  // Ключі для AsyncStorage
+  const STORAGE_KEY_START = 'report_start_date';
+  const STORAGE_KEY_END = 'report_end_date';
+
+  // Зберегти дати в AsyncStorage
+  const saveDatesToStorage = async (start: string, end: string) => {
+    try {
+      await AsyncStorage.setItem(STORAGE_KEY_START, start);
+      await AsyncStorage.setItem(STORAGE_KEY_END, end);
+    } catch (error) {
+      console.error('Save dates error:', error);
+    }
+  };
+
   // Ініціалізація
   useEffect(() => {
     async function init() {
@@ -78,9 +94,18 @@ export function ReportScreen() {
         const activePeriod = await getActivePeriod();
         setPeriod(activePeriod);
 
-        const defaultRange = getDefaultDateRange();
-        setStartDate(defaultRange.start);
-        setEndDate(defaultRange.end);
+        // Спробувати завантажити збережені дати
+        const savedStart = await AsyncStorage.getItem(STORAGE_KEY_START);
+        const savedEnd = await AsyncStorage.getItem(STORAGE_KEY_END);
+
+        if (savedStart && savedEnd) {
+          setStartDate(savedStart);
+          setEndDate(savedEnd);
+        } else {
+          const defaultRange = getDefaultDateRange();
+          setStartDate(defaultRange.start);
+          setEndDate(defaultRange.end);
+        }
         setIsLoading(false);
       } catch (error) {
         console.error('Init error:', error);
@@ -141,8 +166,10 @@ export function ReportScreen() {
   const handleDateSelect = (date: DateData) => {
     if (selectingDate === 'start') {
       setStartDate(date.dateString);
+      saveDatesToStorage(date.dateString, endDate);
     } else {
       setEndDate(date.dateString);
+      saveDatesToStorage(startDate, date.dateString);
     }
     setShowCalendar(false);
   };
@@ -358,33 +385,39 @@ export function ReportScreen() {
 
       {/* Модальне вікно з календарем */}
       <Modal visible={showCalendar} animationType="slide" transparent>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>
-              {selectingDate === 'start' ? 'Початкова дата' : 'Кінцева дата'}
-            </Text>
-            <Calendar
-              onDayPress={handleDateSelect}
-              markedDates={{
-                [selectingDate === 'start' ? startDate : endDate]: {
-                  selected: true,
-                  selectedColor: '#007AFF',
-                },
-              }}
-              theme={{
-                todayTextColor: '#007AFF',
-                selectedDayBackgroundColor: '#007AFF',
-                arrowColor: '#007AFF',
-              }}
-            />
-            <TouchableOpacity
-              style={styles.modalCloseButton}
-              onPress={() => setShowCalendar(false)}
-            >
-              <Text style={styles.modalCloseText}>Закрити</Text>
-            </TouchableOpacity>
+        <TouchableWithoutFeedback onPress={() => setShowCalendar(false)}>
+          <View style={styles.modalOverlay}>
+            <TouchableWithoutFeedback onPress={() => {}}>
+              <View style={styles.modalContent}>
+                <Text style={styles.modalTitle}>
+                  {selectingDate === 'start' ? 'Початкова дата' : 'Кінцева дата'}
+                </Text>
+                <Calendar
+                  onDayPress={handleDateSelect}
+                  markedDates={{
+                    [selectingDate === 'start' ? startDate : endDate]: {
+                      selected: true,
+                      selectedColor: '#007AFF',
+                    },
+                  }}
+                  minDate={period?.start_date}
+                  maxDate={period?.end_date}
+                  theme={{
+                    todayTextColor: '#007AFF',
+                    selectedDayBackgroundColor: '#007AFF',
+                    arrowColor: '#007AFF',
+                  }}
+                />
+                <TouchableOpacity
+                  style={styles.modalCloseButton}
+                  onPress={() => setShowCalendar(false)}
+                >
+                  <Text style={styles.modalCloseText}>Закрити</Text>
+                </TouchableOpacity>
+              </View>
+            </TouchableWithoutFeedback>
           </View>
-        </View>
+        </TouchableWithoutFeedback>
       </Modal>
     </SafeAreaView>
   );

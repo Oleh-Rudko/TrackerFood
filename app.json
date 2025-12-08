@@ -12,6 +12,7 @@
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
+    "primaryColor": "#007AFF",
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.rdk-oleh.trackerfood"

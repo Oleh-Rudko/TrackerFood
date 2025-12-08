@@ -1,6 +1,6 @@
 import * as Notifications from 'expo-notifications';
-import { MealType, MEAL_NAMES, MEAL_PRICES } from '../types';
-import { saveMealEntry, getActivePeriod } from './database';
+import { MealType, MEAL_NAMES, MEAL_PRICES, ScheduleItem } from '../types';
+import { saveMealEntry, getActivePeriod, getSchedule } from './database';
 
 // Категорії notifications
 const MEAL_CATEGORY = 'meal-check';
@@ -218,4 +218,129 @@ export async function cancelAllNotifications(): Promise<void> {
 // Отримати всі заплановані notifications
 export async function getScheduledNotifications(): Promise<Notifications.NotificationRequest[]> {
   return await Notifications.getAllScheduledNotificationsAsync();
+}
+
+// Запланувати notification на конкретний день тижня і час
+export async function scheduleWeeklyMealNotification(
+  mealType: MealType,
+  dayOfWeek: number, // 0 = неділя, 1 = понеділок, ..., 6 = субота
+  hour: number,
+  minute: number
+): Promise<string> {
+  const name = MEAL_NAMES[mealType];
+  const isDinner = mealType === 'dinner';
+  const price = isDinner ? MEAL_PRICES.dinner.default : MEAL_PRICES[mealType];
+
+  const id = await Notifications.scheduleNotificationAsync({
+    content: {
+      title: `🍽️ ${name}?`,
+      categoryIdentifier: isDinner ? DINNER_CATEGORY : MEAL_CATEGORY,
+      data: {
+        mealType,
+        price,
+        isReminder: false,
+      },
+    },
+    trigger: {
+      type: Notifications.SchedulableTriggerInputTypes.WEEKLY,
+      weekday: dayOfWeek === 0 ? 1 : dayOfWeek + 1, // iOS: 1 = неділя, 2 = понеділок
+      hour,
+      minute,
+    },
+  });
+
+  return id;
+}
+
+// Запланувати нагадування на конкретний день тижня (за 5 хв до їжі)
+export async function scheduleWeeklyReminderNotification(
+  mealType: MealType,
+  dayOfWeek: number,
+  hour: number,
+  minute: number
+): Promise<string> {
+  const name = MEAL_NAMES[mealType];
+
+  // Віднімаємо 5 хвилин
+  let reminderHour = hour;
+  let reminderMinute = minute - 5;
+  if (reminderMinute < 0) {
+    reminderMinute = 60 + reminderMinute;
+    reminderHour = hour - 1;
+    if (reminderHour < 0) {
+      reminderHour = 23;
+    }
+  }
+
+  const id = await Notifications.scheduleNotificationAsync({
+    content: {
+      title: `🔔 Скоро ${name.toLowerCase()}!`,
+      body: 'Через 5 хвилин',
+      categoryIdentifier: REMINDER_CATEGORY,
+      data: {
+        mealType,
+        isReminder: true,
+      },
+    },
+    trigger: {
+      type: Notifications.SchedulableTriggerInputTypes.WEEKLY,
+      weekday: dayOfWeek === 0 ? 1 : dayOfWeek + 1,
+      hour: reminderHour,
+      minute: reminderMinute,
+    },
+  });
+
+  return id;
+}
+
+// Оновити всі notifications за розкладом
+export async function syncNotificationsWithSchedule(): Promise<void> {
+  // Скасовуємо всі існуючі
+  await cancelAllNotifications();
+
+  // Отримуємо активний період
+  const period = await getActivePeriod();
+  if (!period?.id) {
+    console.log('No active period, skipping notification sync');
+    return;
+  }
+
+  // Перевіряємо чи період активний (поточна дата в межах періоду)
+  const today = new Date().toISOString().split('T')[0];
+  if (today < period.start_date || today > period.end_date) {
+    console.log('Period is not active for today, skipping notification sync');
+    return;
+  }
+
+  // Отримуємо розклад
+  const schedule = await getSchedule(period.id);
+  if (schedule.length === 0) {
+    console.log('No schedule items, skipping notification sync');
+    return;
+  }
+
+  // Плануємо notifications для кожного пункту розкладу
+  for (const item of schedule) {
+    const [hourStr, minuteStr] = item.time.split(':');
+    const hour = parseInt(hourStr, 10);
+    const minute = parseInt(minuteStr, 10);
+
+    // Планування основного notification
+    await scheduleWeeklyMealNotification(
+      item.meal_type as MealType,
+      item.day_of_week,
+      hour,
+      minute
+    );
+
+    // Планування нагадування (за 5 хв до)
+    await scheduleWeeklyReminderNotification(
+      item.meal_type as MealType,
+      item.day_of_week,
+      hour,
+      minute
+    );
+  }
+
+  console.log(`Synced ${schedule.length} notification schedules`);
 }

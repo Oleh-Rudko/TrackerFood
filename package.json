@@ -9,6 +9,8 @@
     "web": "expo start --web"
   },
   "dependencies": {
+    "@react-native-async-storage/async-storage": "^2.2.0",
+    "@react-native-community/datetimepicker": "8.4.4",
     "@react-navigation/bottom-tabs": "^7.8.12",
     "@react-navigation/native": "^7.1.25",
     "expo": "~54.0.27",
@@ -26,6 +28,7 @@
   },
   "devDependencies": {
     "@types/react": "~19.1.0",
+    "canvas": "^3.2.0",
     "typescript": "~5.9.2"
   },
   "private": true

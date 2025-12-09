@@ -236,6 +236,19 @@ export async function saveScheduleItem(item: Omit<ScheduleItem, 'id'>): Promise<
   );
 }
 
+// Видалити пункт розкладу
+export async function deleteScheduleItem(
+  periodId: number,
+  dayOfWeek: number,
+  mealType: string
+): Promise<void> {
+  if (!db) throw new Error('Database not initialized');
+  await db.runAsync(
+    'DELETE FROM schedule WHERE period_id = ? AND day_of_week = ? AND meal_type = ?',
+    [periodId, dayOfWeek, mealType]
+  );
+}
+
 // Видалити весь розклад для періоду
 export async function clearSchedule(periodId: number): Promise<void> {
   if (!db) throw new Error('Database not initialized');

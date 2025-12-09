@@ -21,6 +21,7 @@ import {
   updatePeriod,
   getSchedule,
   saveScheduleItem,
+  deleteScheduleItem,
   getDisabledDays,
   disableDay,
   enableDay,
@@ -183,6 +184,38 @@ export function SettingsScreen() {
       setEditingSchedule(null);
     } catch (error) {
       Alert.alert('Помилка', 'Не вдалося зберегти час');
+    }
+  };
+
+  // Видалити час
+  const deleteTime = async () => {
+    if (!period?.id || !editingSchedule) return;
+
+    try {
+      await deleteScheduleItem(
+        period.id,
+        editingSchedule.dayOfWeek,
+        editingSchedule.mealType
+      );
+
+      // Оновлюємо локальний стан
+      setSchedule(prev =>
+        prev.filter(
+          s =>
+            !(
+              s.day_of_week === editingSchedule.dayOfWeek &&
+              s.meal_type === editingSchedule.mealType
+            )
+        )
+      );
+
+      // Синхронізуємо notifications з розкладом
+      await syncNotificationsWithSchedule();
+
+      setShowTimePicker(false);
+      setEditingSchedule(null);
+    } catch (error) {
+      Alert.alert('Помилка', 'Не вдалося видалити час');
     }
   };
 
@@ -569,6 +602,12 @@ export function SettingsScreen() {
                   locale="uk-UA"
                   is24Hour={true}
                 />
+                {/* Кнопка видалення - показуємо тільки якщо час вже встановлено */}
+                {editingSchedule && getTimeForMeal(editingSchedule.dayOfWeek, editingSchedule.mealType) && (
+                  <TouchableOpacity style={styles.modalDeleteButton} onPress={deleteTime}>
+                    <Text style={styles.modalDeleteText}>Видалити</Text>
+                  </TouchableOpacity>
+                )}
                 <View style={styles.modalButtons}>
                   <TouchableOpacity
                     style={styles.modalCancelButton}
@@ -758,6 +797,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   modalSaveText: {
+    fontSize: 16,
+    color: '#fff',
+    fontWeight: '600',
+  },
+  modalDeleteButton: {
+    paddingVertical: 12,
+    backgroundColor: '#FF3B30',
+    borderRadius: 10,
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  modalDeleteText: {
     fontSize: 16,
     color: '#fff',
     fontWeight: '600',

@@ -97,18 +97,29 @@ export function HomeScreen() {
     loadDayData();
   }, [loadDayData]);
 
-  // Оновлюємо дані коли додаток повертається у фокус
+  // Оновлюємо дату і дані коли додаток повертається у фокус
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (nextAppState: AppStateStatus) => {
       if (nextAppState === 'active') {
-        loadDayData();
+        // Оновлюємо дату на сьогоднішню
+        const today = new Date();
+        const currentDateStr = formatDateString(currentDate);
+        const todayStr = formatDateString(today);
+
+        if (currentDateStr !== todayStr) {
+          // Якщо дата змінилась - оновлюємо на сьогодні
+          setCurrentDate(today);
+        } else {
+          // Якщо та сама дата - просто перезавантажуємо дані
+          loadDayData();
+        }
       }
     });
 
     return () => {
       subscription.remove();
     };
-  }, [loadDayData]);
+  }, [loadDayData, currentDate]);
 
   // Обробка зміни статусу їжі
   const handleMealToggle = async (mealType: MealType, ate: boolean, price?: number) => {
